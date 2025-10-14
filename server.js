@@ -1,6 +1,8 @@
 import express from "express";
+import fs from "fs";
 import db from "./src/config/dbconnect.js";
-import http from "http";
+// import http from "http";
+import https from "https";
 import cors from "cors";
 import { Server } from "socket.io";
 import { userRoutes } from "./src/routes/UserRoutes.js";
@@ -10,11 +12,16 @@ dotenv.config();
 const PORT = process.env.PORT || 5000;
 
 const app = express();
+const options = {
+  key: fs.readFileSync("key.pem"),
+  cert: fs.readFileSync("cert.pem"),
+};
+
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-const server = http.createServer(app);
+const server = https.createServer(options,app);
 
 const io = new Server(server, {
   cors: {
