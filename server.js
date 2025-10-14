@@ -60,7 +60,7 @@ io.on("connection", (socket) => {
       lt_location_permission,
     } = data;
 
-  // 🔹 broadcast location update to all dashboards
+  // broadcast location update to all dashboards
         io.emit("user-location", {
           lt_user_id,
           lt_name,
@@ -72,6 +72,26 @@ io.on("connection", (socket) => {
           lt_location_permission,
           
         });
+  });
+
+
+   // 🔹 NEW: Send notification to a specific user
+  socket.on("send-notification", (data) => {
+    const { e_id, notification_message } = data;
+    console.log(" Notification event received:", data);
+
+    // find target user's socket
+    const targetUser = users[e_id];
+    if (targetUser && targetUser.socketId) {
+      io.to(targetUser.socketId).emit("receive-notification", {
+        message: notification_message,
+        from: socket.id,
+        time: new Date(),
+      });
+      console.log(` Notification sent to user ${e_id}`);
+    } else {
+      console.log(` User ${e_id} not connected`);
+    }
   });
 
   socket.on("disconnect", () => {
