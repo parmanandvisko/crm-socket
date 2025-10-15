@@ -2,7 +2,7 @@ import express from "express";
 import fs from "fs";
 import db from "./src/config/dbconnect.js";
 // import http from "http";
-import https from "https";
+import http from "http";
 import cors from "cors";
 import { Server } from "socket.io";
 import { userRoutes } from "./src/routes/UserRoutes.js";
@@ -12,16 +12,18 @@ dotenv.config();
 const PORT = process.env.PORT || 5000;
 
 const app = express();
-const options = {
-  key: fs.readFileSync("key.pem"),
-  cert: fs.readFileSync("cert.pem"),
-};
+
+// const options = {
+//   key: fs.readFileSync("key.pem"),
+//   cert: fs.readFileSync("cert.pem"),
+// };
+
 
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-const server = https.createServer(options,app);
+const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
@@ -33,6 +35,29 @@ const io = new Server(server, {
 });
 
 app.use("/api/user/", userRoutes);
+
+
+
+
+// app.post("/api/send-notification", (req, res) => {
+//   const { e_id, notification_message } = req.body;
+
+//   // Find the target user
+//   const targetUser = users[e_id];
+
+//   if (targetUser && targetUser.socketId) {
+//     io.to(targetUser.socketId).emit("receive-notification", {
+//       message: notification_message,
+//       from: "Server",
+//       time: new Date(),
+//     });
+//     console.log(` Notification sent to user ${e_id}`);
+//     return res.json({ status: "success", message: "Notification sent" });
+//   }
+
+//   console.log(` User ${e_id} not connected`);
+//   return res.status(404).json({ status: "error", message: "User not connected" });
+// });
 
 const users = {}; // username: socketId
 console.log(users,"userss")
@@ -82,12 +107,28 @@ io.on("connection", (socket) => {
   });
 
 
-   // 🔹 NEW: Send notification to a specific user
+   
   socket.on("send-notification", (data) => {
-    const { e_id, notification_message } = data;
+    const { e_id, notification_message, isBroadcast ,redirect } = data;
     console.log(" Notification event received:", data);
 
-    // find target user's socket
+
+    if (isBroadcast) {
+      console.log("brodcast inside")
+    // Broadcast sabhi ko jo jo connect he users
+    io.emit("receive-notification", {
+      message: notification_message,
+      from: "Management Team1",
+      redirect:redirect,
+      time: new Date(),
+    });
+    console.log("Broadcast sabhi ko chala jaega");
+    // return;
+  }else{
+
+      console.log("brodcast outside")
+
+// find target user's socket
     const targetUser = users[e_id];
     if (targetUser && targetUser.socketId) {
       io.to(targetUser.socketId).emit("receive-notification", {
@@ -95,10 +136,14 @@ io.on("connection", (socket) => {
         from: socket.id,
         time: new Date(),
       });
-      console.log(` Notification sent to user ${e_id}`);
+      console.log(`Notification sent to user ${e_id}`);
     } else {
       console.log(` User ${e_id} not connected`);
     }
+    
+  }
+
+    
   });
 
   socket.on("disconnect", () => {
