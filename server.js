@@ -56,6 +56,7 @@ const users = {}; // username: socketId
 
 io.on("connection", (socket) => {
   console.log("socket connected",socket.id);
+  
 
    // JOIN USER
   socket.on("join", ({ lt_user_id, lt_name }) => {
