@@ -10,14 +10,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 const PORT = process.env.PORT || 5000;
-
 const app = express();
-
-// const options = {
-//   key: fs.readFileSync("key.pem"),
-//   cert: fs.readFileSync("cert.pem"),
-// };
-
 
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
@@ -60,7 +53,6 @@ app.use("/api/user/", userRoutes);
 // });
 
 const users = {}; // username: socketId
-console.log(users,"userss")
 
 io.on("connection", (socket) => {
   console.log("socket connected",socket.id);
@@ -101,21 +93,16 @@ io.on("connection", (socket) => {
           lt_app_time,
           lt_isInternetOn_Off,
           lt_locationOn_off,
-          lt_location_permission,
-          
+          lt_location_permission,  
         });
   });
-
-
-   
+ 
   socket.on("send-notification", (data) => {
     const { e_id, notification_message, isBroadcast ,redirect } = data;
     console.log(" Notification event received:", data);
 
-
+// Broadcast sabhi ko jo jo connect he users
     if (isBroadcast) {
-      console.log("brodcast inside")
-    // Broadcast sabhi ko jo jo connect he users
     io.emit("receive-notification", {
       message: notification_message,
       from: "Management Team1",
@@ -123,12 +110,8 @@ io.on("connection", (socket) => {
       time: new Date(),
     });
     console.log("Broadcast sabhi ko chala jaega");
-    // return;
   }else{
-
-      console.log("brodcast outside")
-
-// find target user's socket
+//  specific user message 
     const targetUser = users[e_id];
     if (targetUser && targetUser.socketId) {
       io.to(targetUser.socketId).emit("receive-notification", {
@@ -140,11 +123,11 @@ io.on("connection", (socket) => {
     } else {
       console.log(` User ${e_id} not connected`);
     }
-    
   }
-
-    
   });
+
+
+
 
   socket.on("disconnect", () => {
     for (const [user_id, userObj] of Object.entries(users)) {
@@ -153,7 +136,6 @@ io.on("connection", (socket) => {
         break;
       }
     }
-
       io.emit("online-users", Object.values(users));
   });
   });
@@ -328,3 +310,44 @@ server.listen(PORT, () => {
 // server.listen(PORT, () => {
 //   console.log(`Server running on port ${PORT}`);
 // });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// import express from "express";
+// import http from "http";
+// import cors from "cors";
+// import dotenv from "dotenv";
+// import db from "./src/config/dbconnect.js";
+// import { userRoutes } from "./src/routes/UserRoutes.js";
+// import { initializeSocket } from "./src/sockets/index.js";
+
+// dotenv.config();
+// const PORT = process.env.PORT || 5000;
+
+// const app = express();
+// app.use(cors());
+// app.use(express.urlencoded({ extended: true }));
+// app.use(express.json());
+// app.use("/api/user/", userRoutes);
+
+// const server = http.createServer(app);
+
+// //  Initialize socket system
+// initializeSocket(server);
+
+// server.listen(PORT, () => {
+//   console.log(` Server running on port ${PORT}`);
+// });
+
