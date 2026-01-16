@@ -29,29 +29,6 @@ const io = new Server(server, {
 
 app.use("/api/user/", userRoutes);
 
-
-
-
-// app.post("/api/send-notification", (req, res) => {
-//   const { e_id, notification_message } = req.body;
-
-//   // Find the target user
-//   const targetUser = users[e_id];
-
-//   if (targetUser && targetUser.socketId) {
-//     io.to(targetUser.socketId).emit("receive-notification", {
-//       message: notification_message,
-//       from: "Server",
-//       time: new Date(),
-//     });
-//     console.log(` Notification sent to user ${e_id}`);
-//     return res.json({ status: "success", message: "Notification sent" });
-//   }
-
-//   console.log(` User ${e_id} not connected`);
-//   return res.status(404).json({ status: "error", message: "User not connected" });
-// });
-
 const users = {}; // username: socketId
 
 io.on("connection", (socket) => {
@@ -59,7 +36,7 @@ io.on("connection", (socket) => {
   
 
    // JOIN USER
-  socket.on("join", ({ lt_user_id, lt_name }) => {
+  socket.on("join", ({ lt_user_id, lt_name ,task_id}) => {
     console.log("Active Users:", users);
 
     users[lt_user_id] = {
@@ -69,8 +46,17 @@ io.on("connection", (socket) => {
       lt_longitude: null,
       lastUpdated: null,
     };
+    
+
+  //  join task room for comment
+  if (task_id) {
+    socket.join(`task_${task_id}`);
+    console.log(`${lt_name} joined task_${task_id}`);
+  }
+
     console.log("Active Users:", users);
     io.emit("online-users", Object.values(users)); 
+    
   });
 
   socket.on("location-update", (data) => {
@@ -126,6 +112,35 @@ io.on("connection", (socket) => {
     }
   }
   });
+
+
+  //======================SEND MESSAGE ON TASK==============START
+
+//======================SEND COMMENT ON TASK======================START
+
+
+
+//======================SEND COMMENT ON TASK========================END
+
+
+socket.on("send-comment", (data) => {
+  console.log(data,"123456789")
+  const { task_id, tc_comment, e_id } = data;
+
+  // send to everyone in task room (including sender)
+  io.to(`task_${task_id}`).emit("receive-comment", {
+    task_id,
+    message: tc_comment,
+    from: e_id,
+    time: new Date(),
+  });
+
+  // console.log(`Comment sent to task_${task_id}`);
+});
+
+
+
+  //======================SEND MESSAGE ON TASK==============END
 
 
 
