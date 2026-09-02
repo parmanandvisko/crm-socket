@@ -160,4 +160,58 @@ export const handleChatSocket = (io, socket) => {
       safeAck(ack, { status: false, message: error.message });
     }
   });
+
+  socket.on("chat:delete-message", async ({ conversationId, messageId } = {}, ack) => {
+    try {
+      const employee = getEmployee(socket);
+      const [conversation, message] = await Promise.all([
+        ChatConversation.findById(conversationId),
+        ChatMessage.findById(messageId),
+      ]);
+      if (!hasAccess(conversation, employee.id)) throw new Error("Conversation access denied");
+      if (!message || String(message.conversationId) !== String(conversation._id)) {
+        throw new Error("Message not found");
+      }
+
+      const isSender = String(message.sender.employeeId) === String(employee.id);
+      const isGroupAdmin = conversation.type === "group" && conversation.admins.some(
+        (adminId) => String(adminId) === String(employee.id),
+      );
+      if (!isSender && !isGroupAdmin) throw new Error("Only the sender or group admin can delete this message");
+      if (message.deletedForEveryone) return safeAck(ack, { status: true });
+
+      const fileIds = message.attachments.map((attachment) => attachment.fileId).filter(Boolean);
+      if (fileIds.length) {
+        const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: "chat_uploads" });
+        await Promise.all(fileIds.map((fileId) => bucket.delete(fileId).catch(() => {})));
+      }
+
+      const wasLastMessage = Boolean(
+        conversation.lastMessage?.createdAt && message.createdAt &&
+        new Date(conversation.lastMessage.createdAt).getTime() === new Date(message.createdAt).getTime()
+      );
+      message.text = "";
+      message.attachments = [];
+      message.deletedForEveryone = true;
+      await message.save();
+
+      if (wasLastMessage) {
+        conversation.lastMessage.text = "Message deleted";
+        await conversation.save();
+      }
+
+      const payload = {
+        conversationId: String(conversation._id),
+        messageId: String(message._id),
+        deletedBy: employee.id,
+        wasLastMessage,
+      };
+      conversation.participants.forEach((participant) => {
+        io.to(`employee:${participant.employeeId}`).emit("chat:message-deleted", payload);
+      });
+      safeAck(ack, { status: true });
+    } catch (error) {
+      safeAck(ack, { status: false, message: error.message });
+    }
+  });
 };

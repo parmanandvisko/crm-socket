@@ -42,7 +42,26 @@ export const listConversations = async (req, res) => {
       .sort({ updatedAt: -1 })
       .lean();
 
-    res.json({ status: true, data: conversations });
+    const unreadCounts = await ChatMessage.aggregate([
+      {
+        $match: {
+          conversationId: { $in: conversations.map((conversation) => conversation._id) },
+          "sender.employeeId": { $ne: req.employee.id },
+          "readBy.employeeId": { $ne: req.employee.id },
+          deletedForEveryone: { $ne: true },
+        },
+      },
+      { $group: { _id: "$conversationId", count: { $sum: 1 } } },
+    ]);
+    const countByConversation = new Map(
+      unreadCounts.map((item) => [String(item._id), item.count]),
+    );
+    const conversationsWithUnread = conversations.map((conversation) => ({
+      ...conversation,
+      unreadCount: countByConversation.get(String(conversation._id)) || 0,
+    }));
+
+    res.json({ status: true, data: conversationsWithUnread });
   } catch (error) {
     res.status(500).json({ status: false, message: error.message });
   }
