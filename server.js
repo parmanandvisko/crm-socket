@@ -143,8 +143,6 @@ socket.on("send-comment", (data) => {
   //======================SEND MESSAGE ON TASK==============END
 
 
-
-
   socket.on("disconnect", () => {
     for (const [user_id, userObj] of Object.entries(users)) {
       if (userObj.socketId === socket.id) {
