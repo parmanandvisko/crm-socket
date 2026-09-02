@@ -7,12 +7,21 @@ import cors from "cors";
 import { Server } from "socket.io";
 import { userRoutes } from "./src/routes/UserRoutes.js";
 import dotenv from "dotenv";
+import { chatRoutes } from "./src/routes/ChatRoutes.js";
+import { connectMongoDB, isMongoReady } from "./src/config/mongodb.js";
+import { getSocketEmployee } from "./src/middleware/chatAuth.js";
+import { handleChatSocket, registerChatSocket } from "./src/sockets/chat.js";
 
 dotenv.config();
 const PORT = process.env.PORT || 5000;
+const configuredOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const corsOrigin = configuredOrigins.length ? configuredOrigins : "*";
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: corsOrigin }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -20,7 +29,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: corsOrigin,
     methods: ["GET", "POST"],
   },
    pingTimeout: 20000,   
@@ -28,8 +37,51 @@ const io = new Server(server, {
 });
 
 app.use("/api/user/", userRoutes);
+app.use(
+  "/api/chat",
+  (req, res, next) => {
+    if (!isMongoReady()) {
+      return res.status(503).json({ status: false, message: "Chat database is unavailable" });
+    }
+    next();
+  },
+  chatRoutes,
+);
 
 const users = {}; // username: socketId
+const chatIo = io.of("/chat");
+const chatOnlineUsers = new Map();
+app.set("chatIo", chatIo);
+
+chatIo.use((socket, next) => {
+  try {
+    socket.data.chatEmployee = getSocketEmployee(socket);
+    next();
+  } catch (error) {
+    next(new Error(error.message));
+  }
+});
+
+chatIo.on("connection", (socket) => {
+  console.log("chat socket connected", socket.id);
+  const employeeId = socket.data.chatEmployee.id;
+  const employeeSockets = chatOnlineUsers.get(employeeId) || new Set();
+  employeeSockets.add(socket.id);
+  chatOnlineUsers.set(employeeId, employeeSockets);
+  chatIo.emit("chat:presence", Array.from(chatOnlineUsers.keys()));
+
+  registerChatSocket(socket).catch((error) =>
+    console.error("Chat registration failed:", error.message),
+  );
+  handleChatSocket(chatIo, socket);
+
+  socket.on("disconnect", () => {
+    const sockets = chatOnlineUsers.get(employeeId);
+    sockets?.delete(socket.id);
+    if (!sockets?.size) chatOnlineUsers.delete(employeeId);
+    chatIo.emit("chat:presence", Array.from(chatOnlineUsers.keys()));
+  });
+});
 
 io.on("connection", (socket) => {
   console.log("socket connected",socket.id);
@@ -154,8 +206,10 @@ socket.on("send-comment", (data) => {
   });
   });
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+connectMongoDB().finally(() => {
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 });
 
 
