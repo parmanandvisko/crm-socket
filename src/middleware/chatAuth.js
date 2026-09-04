@@ -14,6 +14,8 @@ export const normalizeEmployee = (payload = {}) => ({
     "Employee",
   photo: payload.e_photo || payload.photo || "",
   role: payload.e_designation || payload.role || "Employee",
+  roleId: payload.e_role ?? payload.r_id ?? payload.roleId ?? null,
+  cSuite: payload.e_c_suit ?? payload.e_c_suite ?? payload.cSuite ?? null,
 });
 
 export const verifyChatToken = (token) => {
